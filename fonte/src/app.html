@@ -36,6 +36,11 @@ section.panel { display: flex; flex-direction: column; gap: 14px; margin-top: 14
 .f input { width: 100%; font: 600 17px var(--f-num); padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font-variant-numeric: tabular-nums; }
 .f input:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
 .f.req input { border-color: var(--accent); }
+.f input.lido { background: var(--high-soft); border-color: var(--high); }
+textarea#colar { width: 100%; min-height: 64px; font: 14px var(--f-num); padding: 8px; border: 1px dashed var(--accent); border-radius: 8px; background: var(--bg); color: var(--ink); resize: vertical; }
+textarea#colar:focus { outline: 2px solid var(--accent); border-style: solid; }
+.lido-msg { font-size: 13px; margin: 8px 0 0; color: var(--ink); }
+.lido-msg .nota { color: var(--muted); display: block; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: 500 13px var(--f-ui); padding: 6px 10px; border-radius: 999px; cursor: pointer; }
 .chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
@@ -84,7 +89,7 @@ table.calc td.fm { color: var(--muted); font-size: 12px; }
 
 <div class="wrap">
   <header class="top">
-    <h1>Gasoapp <small>v0.1 · protótipo</small></h1>
+    <h1>Gasoapp <small>v0.2 · protótipo</small></h1>
     <nav class="tabs" role="tablist">
       <button id="t-gaso" role="tab" aria-selected="true" data-tab="gaso">Gasometria</button>
       <button id="t-stewart" role="tab" aria-selected="false" data-tab="stewart">Stewart</button>
@@ -93,6 +98,11 @@ table.calc td.fm { color: var(--muted); font-size: 12px; }
   </header>
 
   <section class="panel" id="p-entrada">
+    <div class="box">
+      <p class="lbl">Colar gasometria</p>
+      <textarea id="colar" placeholder="Aponte a câmera do iPhone para o laudo, toque no ícone de Texto ao Vivo, copie e cole aqui. Os campos são preenchidos sozinhos."></textarea>
+      <p class="lido-msg" id="lido-msg" hidden></p>
+    </div>
     <div class="box">
       <p class="lbl">Ácido-base <button class="btn" id="limpar" type="button">Limpar tudo</button></p>
       <div class="grid" id="g-ab"></div>
@@ -124,6 +134,9 @@ table.calc td.fm { color: var(--muted); font-size: 12px; }
 </script>
 <script>
 /*MOTOR*/
+</script>
+<script>
+/*LEITOR*/
 </script>
 <script>
 const CAMPOS = {
@@ -222,9 +235,23 @@ function renderFontes() {
   $("#p-fontes").innerHTML = h;
 }
 
-document.addEventListener("input", (ev) => { if (ev.target.matches(".f input")) { $("#aviso-exemplo").hidden = true; render(); } });
+document.addEventListener("input", (ev) => { if (ev.target.matches(".f input")) { ev.target.classList.remove("lido"); $("#aviso-exemplo").hidden = true; render(); } });
+const NOMES = Object.fromEntries(Object.values(CAMPOS).flat().map(([id, nome]) => [id, nome]));
+$("#colar").addEventListener("input", () => {
+  const txt = $("#colar").value; const msg = $("#lido-msg");
+  if (!txt.trim()) { msg.hidden = true; return; }
+  const { valores, notas } = lerLaudo(txt);
+  const ids = Object.keys(valores);
+  if (!ids.length) { msg.hidden = false; msg.innerHTML = "Não reconheci valores nesse texto. Confira se copiou o laudo inteiro."; return; }
+  if (!$("#aviso-exemplo").hidden) carregar(null);
+  document.querySelectorAll(".f input").forEach((i) => i.classList.remove("lido"));
+  for (const [id, v] of Object.entries(valores)) { const i = $("#i-" + id); if (i) { i.value = String(v).replace(".", ","); i.classList.add("lido"); } }
+  msg.hidden = false;
+  msg.innerHTML = `<b>Preenchi ${ids.length} campos</b> (em amarelo): ${ids.map((k) => esc(NOMES[k] || k)).join(", ")}. Confira com o papel antes de usar.` + notas.map((n) => `<span class="nota">${esc(n)}</span>`).join("");
+  render();
+});
 $("#ctx").addEventListener("click", (ev) => { const b = ev.target.closest(".chip"); if (!b) return; const id = b.dataset.ctx; ctxState[id] = !ctxState[id]; b.setAttribute("aria-pressed", ctxState[id]); render(); });
-$("#limpar").addEventListener("click", () => { carregar(null); $("#i-pH").focus(); });
+$("#limpar").addEventListener("click", () => { carregar(null); $("#colar").value = ""; $("#lido-msg").hidden = true; document.querySelectorAll(".f input").forEach((i) => i.classList.remove("lido")); $("#i-pH").focus(); });
 document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
   document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", x === b));
   const t = b.dataset.tab;

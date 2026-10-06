@@ -1,5 +1,5 @@
 // Service worker: guarda o app no aparelho para abrir sem internet. A versão muda a cada build.
-const CACHE = "gasoapp-0f5cf6ef1a";
+const CACHE = "gasoapp-ab9afda508";
 const ARQUIVOS = ["./", "./index.html", "./manifest.webmanifest", "./icone-180.png", "./icone-192.png", "./icone-512.png"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARQUIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });

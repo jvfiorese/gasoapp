@@ -2,7 +2,7 @@
 import pathlib
 b = pathlib.Path(__file__).parent
 app = (b/"src/app.html").read_text()
-app = app.replace("/*FONTES*/", (b/"src/fontes.js").read_text()).replace("/*MOTOR*/", (b/"src/motor.js").read_text())
+app = app.replace("/*FONTES*/", (b/"src/fontes.js").read_text()).replace("/*MOTOR*/", (b/"src/motor.js").read_text()).replace("/*LEITOR*/", (b/"src/leitor.js").read_text())
 d = b/"dist"; d.mkdir(exist_ok=True)
 (d/"gasoapp.html").write_text(app)
 head = '''<!doctype html>
