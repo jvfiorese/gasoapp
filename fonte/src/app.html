@@ -1,0 +1,236 @@
+<title>Gasoapp</title>
+<style>
+/* Layout: ferramenta de uma coluna para iPhone; entrada compacta no topo, laudo logo abaixo, mais urgente primeiro. Fontes do sistema (funciona offline). */
+:root {
+  --bg: #f3f5f7; --surface: #ffffff; --ink: #14202b; --muted: #5b6b7a; --line: #d9e0e7;
+  --accent: #1b5e8c; --accent-soft: #e3eef6;
+  --crit: #b3261e; --crit-soft: #fbe9e7; --high: #a15c00; --high-soft: #fdf0dc; --ok: #2e7d4f; --ok-soft: #e4f3ea;
+  --f-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --f-num: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f151b; --surface: #18212a; --ink: #e6edf3; --muted: #93a3b3; --line: #2a3643;
+  --accent: #6cb4e4; --accent-soft: #1b3142;
+  --crit: #ff8a80; --crit-soft: #3a1c1a; --high: #f2b35a; --high-soft: #35281a; --ok: #7fd1a1; --ok-soft: #173025; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f151b; --surface: #18212a; --ink: #e6edf3; --muted: #93a3b3; --line: #2a3643;
+  --accent: #6cb4e4; --accent-soft: #1b3142;
+  --crit: #ff8a80; --crit-soft: #3a1c1a; --high: #f2b35a; --high-soft: #35281a; --ok: #7fd1a1; --ok-soft: #173025; color-scheme: dark }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--f-ui); margin: 0; }
+.wrap { max-width: 720px; margin: 0 auto; padding-inline: 16px; padding-block: 8px 48px; }
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 10px 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+h1 small { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 6px; }
+.tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+.tabs button { border: 0; background: none; color: var(--muted); font: 600 13px var(--f-ui); padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--surface); }
+section.panel { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
+.box { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px; }
+.lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.f { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.f label { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.f label b { color: var(--ink); font-weight: 600; }
+.f input { width: 100%; font: 600 17px var(--f-num); padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font-variant-numeric: tabular-nums; }
+.f input:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+.f.req input { border-color: var(--accent); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: 500 13px var(--f-ui); padding: 6px 10px; border-radius: 999px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.chip:focus-visible, .tabs button:focus-visible, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 600 13px var(--f-ui); padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+.sample { font-size: 12px; color: var(--high); background: var(--high-soft); padding: 6px 10px; border-radius: 8px; }
+.resumo { border-left: 4px solid var(--accent); }
+.resumo .estado { display: inline-block; font: 700 12px var(--f-ui); text-transform: uppercase; letter-spacing: 0.06em; padding: 3px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.resumo .estado.acidemia, .resumo .estado.alcalemia { background: var(--high-soft); color: var(--high); }
+.resumo p.dx { font-size: 17px; font-weight: 650; margin: 8px 0 0; text-wrap: balance; }
+.avisos { margin: 8px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+.alerta { border-left: 4px solid var(--high); background: var(--high-soft); border-color: var(--high); }
+.alerta.critico { border-left-color: var(--crit); background: var(--crit-soft); }
+.alerta h3 { margin: 0 0 6px; font-size: 15px; color: var(--high); }
+.alerta.critico h3 { color: var(--crit); }
+ul.cd { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.fontes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.fontes a, .fontes span { font-size: 11.5px; color: var(--accent); background: var(--accent-soft); padding: 2px 8px; border-radius: 999px; text-decoration: none; }
+.fontes span.n3 { color: var(--muted); background: var(--bg); }
+details.grupo > summary { cursor: pointer; font-weight: 650; list-style: none; display: flex; justify-content: space-between; gap: 8px; }
+details.grupo > summary::after { content: "+"; color: var(--muted); font-family: var(--f-num); }
+details.grupo[open] > summary::after { content: "−"; }
+.hip { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
+.hip h4 { margin: 0 0 6px; font-size: 14.5px; display: flex; gap: 8px; align-items: baseline; }
+.hip h4 .rank { font: 700 11px var(--f-num); color: var(--muted); }
+.rf { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; margin-bottom: 8px; }
+.rf div { min-width: 0; }
+.rf b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+.rf .mais b { color: var(--ok); } .rf .menos b { color: var(--crit); }
+.rf ul { margin: 2px 0 0; padding-left: 16px; color: var(--muted); }
+.condlbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; color: var(--accent); margin: 4px 0; }
+table.calc { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.calc td { padding: 6px 4px; border-top: 1px solid var(--line); vertical-align: top; }
+table.calc td.v { font-family: var(--f-num); font-weight: 700; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+table.calc td.fm { color: var(--muted); font-size: 12px; }
+.tablewrap { overflow-x: auto; }
+.st-bar { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 14px; }
+.st-bar .v { font-family: var(--f-num); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.neg { color: var(--crit); } .pos { color: var(--ok); }
+.ref p { margin: 0 0 8px; font-size: 13px; }
+.ref .nv { font: 700 11px var(--f-num); color: var(--muted); margin-right: 6px; }
+.disc { font-size: 12px; color: var(--muted); text-align: center; margin-top: 18px; }
+@media (max-width: 420px) { .rf { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>Gasoapp <small>v0.1 · protótipo</small></h1>
+    <nav class="tabs" role="tablist">
+      <button id="t-gaso" role="tab" aria-selected="true" data-tab="gaso">Gasometria</button>
+      <button id="t-stewart" role="tab" aria-selected="false" data-tab="stewart">Stewart</button>
+      <button id="t-fontes" role="tab" aria-selected="false" data-tab="fontes">Fontes</button>
+    </nav>
+  </header>
+
+  <section class="panel" id="p-entrada">
+    <div class="box">
+      <p class="lbl">Ácido-base <button class="btn" id="limpar" type="button">Limpar tudo</button></p>
+      <div class="grid" id="g-ab"></div>
+    </div>
+    <div class="box">
+      <p class="lbl">Eletrólitos e metabólitos</p>
+      <div class="grid" id="g-el"></div>
+    </div>
+    <div class="box">
+      <p class="lbl">Oxigenação e paciente</p>
+      <div class="grid" id="g-ox"></div>
+    </div>
+    <div class="box">
+      <p class="lbl">Contexto intraoperatório</p>
+      <div class="chips" id="ctx"></div>
+    </div>
+    <p class="sample" id="aviso-exemplo">Exemplo preenchido (laparoscopia com hipercapnia). Toque em "Limpar tudo" para inserir a sua gasometria.</p>
+  </section>
+
+  <section class="panel" id="p-gaso"></section>
+  <section class="panel" id="p-stewart" hidden></section>
+  <section class="panel" id="p-fontes" hidden></section>
+
+  <p class="disc">Ferramenta de apoio à decisão. Não substitui o julgamento clínico. Nenhum dado sai deste aparelho.</p>
+</div>
+
+<script>
+/*FONTES*/
+</script>
+<script>
+/*MOTOR*/
+</script>
+<script>
+const CAMPOS = {
+  "g-ab": [["pH", "pH", "", true], ["pco2", "PaCO₂", "mmHg", true], ["hco3", "HCO₃⁻", "mmol/L", true], ["be", "BE", "mmol/L"]],
+  "g-el": [["na", "Na⁺", "mmol/L"], ["k", "K⁺", "mmol/L"], ["cl", "Cl⁻", "mmol/L"], ["alb", "Albumina", "g/dL"], ["lact", "Lactato", "mmol/L"], ["glic", "Glicose", "mg/dL"], ["cai", "Ca²⁺ iôn.", "mmol/L"], ["mg", "Mg", "mg/dL"], ["fosf", "Fosfato", "mg/dL"]],
+  "g-ox": [["pao2", "PaO₂", "mmHg"], ["fio2", "FiO₂", "%"], ["etco2", "EtCO₂", "mmHg"], ["idade", "Idade", "anos"], ["peso", "Peso", "kg"]],
+};
+const CTX = [["laparoscopia", "Laparoscopia / CO₂"], ["gatilhoHM", "Halogenado ou succinilcolina"], ["transfusao", "Transfusão maciça"], ["sf", "Muito SF 0,9%"], ["rtu", "RTU / histeroscopia"], ["sepse", "Sepse / choque"], ["diabetes", "Diabetes"], ["isglt2", "Usa iSGLT2"], ["renal", "LRA / DRC"], ["dpoc", "DPOC / hipercapnia crônica"], ["cronico", "Distúrbio respiratório crônico"], ["espontanea", "Ventilação espontânea"]];
+const EXEMPLO = { v: { pH: "7,27", pco2: "58", hco3: "26", na: "139", k: "4,6", cl: "103", alb: "3,8", lact: "1,4", glic: "132", pao2: "142", fio2: "50", etco2: "51", idade: "54", peso: "78" }, ctx: { laparoscopia: true, gatilhoHM: true } };
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ctxState = {};
+
+for (const [g, campos] of Object.entries(CAMPOS)) {
+  $("#" + g).innerHTML = campos.map(([id, nome, un, req]) =>
+    `<div class="f${req ? " req" : ""}"><label for="i-${id}"><b>${nome}</b> ${un}</label><input id="i-${id}" inputmode="decimal" autocomplete="off" enterkeyhint="next"></div>`).join("");
+}
+$("#ctx").innerHTML = CTX.map(([id, nome]) => `<button type="button" class="chip" id="c-${id}" data-ctx="${id}" aria-pressed="false">${nome}</button>`).join("");
+
+function carregar(ex) {
+  document.querySelectorAll(".f input").forEach((i) => (i.value = ex ? ex.v[i.id.slice(2)] || "" : ""));
+  CTX.forEach(([id]) => { ctxState[id] = !!(ex && ex.ctx[id]); $("#c-" + id).setAttribute("aria-pressed", ctxState[id]); });
+  $("#aviso-exemplo").hidden = !ex;
+  render();
+}
+
+function lerEntrada() {
+  const e = { ctx: { ...ctxState, ventilado: !ctxState.espontanea } };
+  document.querySelectorAll(".f input").forEach((i) => { const v = i.value.trim().replace(",", "."); if (v !== "") e[i.id.slice(2)] = v; });
+  return e;
+}
+
+function fontesHTML(ids) {
+  return `<div class="fontes">${ids.map((id) => {
+    const f = FONTES[id]; if (!f) return "";
+    const curto = f.ref.split(".")[0].replace(/ et al$/, "") + (f.ref.match(/(19|20)\d\d/) ? " " + f.ref.match(/(19|20)\d\d/)[0] : "");
+    const nome = id === "miller" ? "Miller's Anesthesia" : id === "ukka2023" ? "UKKA 2023/2026" : id === "emhg2024" ? "EMHG 2024" : id.startsWith("bicaricu2") ? "BICARICU-2 2025" : id === "bicaricu2018" ? "BICAR-ICU 2018" : curto;
+    const link = linkFonte(id);
+    return link ? `<a href="${link}" target="_blank" rel="noopener" title="${esc(f.ref)}">${esc(nome)}</a>` : `<span class="n3" title="${esc(f.ref)}">${esc(nome)}</span>`;
+  }).join("")}</div>`;
+}
+
+function render() {
+  const R = analisar(lerEntrada());
+  let h = "";
+  if (!R.disturbios.length && !R.resumo) {
+    h = `<div class="box resumo"><p class="dx">Preencha pH, PaCO₂ e HCO₃⁻.</p></div>`;
+  } else {
+    h += `<div class="box resumo"><span class="estado ${R.estado === "pH normal" ? "" : R.estado}">${esc(R.estado || "")}</span>
+      <p class="dx">${esc(R.resumo)}</p>${R.avisos.length ? `<ul class="avisos">${R.avisos.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}</div>`;
+    for (const a of R.alertas) h += `<div class="box alerta ${a.nivel}"><h3>${esc(a.titulo)}</h3><ul class="cd">${a.conduta.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>${fontesHTML(a.fontes)}</div>`;
+    R.hipoteses.forEach((g, gi) => {
+      if (!g.itens.length) return;
+      h += `<details class="box grupo" ${gi === 0 ? "open" : ""}><summary>${esc(g.grupo)} <span class="lbl" style="margin:0">${g.itens.length} hipóteses</span></summary>`;
+      g.itens.forEach((it, i) => {
+        h += `<div class="hip"><h4><span class="rank">${i + 1}</span>${esc(it.titulo)}</h4>
+          ${it.reforca.length || it.afasta.length ? `<div class="rf"><div class="mais"><b>Reforça</b><ul>${it.reforca.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div><div class="menos"><b>Afasta</b><ul>${it.afasta.map((x) => `<li>${esc(x)}</li>`).join("") || "<li>—</li>"}</ul></div></div>` : ""}
+          <p class="condlbl">Conduta</p><ul class="cd">${it.conduta.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>${fontesHTML(it.fontes)}</div>`;
+      });
+      h += `</details>`;
+    });
+    if (R.calculos.length) h += `<details class="box grupo"><summary>Mostrar cálculos</summary><div class="tablewrap"><table class="calc">${R.calculos.map((c) => `<tr><td>${esc(c.nome)}</td><td class="v">${esc(c.valor)}</td><td class="fm">${esc(c.formula)}</td></tr>`).join("")}</table></div>${fontesHTML(["berend2014", "figge1998", "rastegar2007"])}</details>`;
+  }
+  $("#p-gaso").innerHTML = h;
+  renderStewart(R);
+}
+
+function renderStewart(R) {
+  const S = R.stewart;
+  const sinal = (v) => (v === null ? "—" : `<span class="${v < 0 ? "neg" : v > 0 ? "pos" : ""}">${v > 0 ? "+" : ""}${String(v).replace(".", ",")}</span>`);
+  if (!S) { $("#p-stewart").innerHTML = `<div class="box"><p class="dx">Informe pelo menos pH, PaCO₂, HCO₃⁻, Na⁺ e Cl⁻ (idealmente albumina, lactato e K⁺).</p></div>`; return; }
+  const s = S.simplificado;
+  let h = `<div class="box"><p class="lbl">Abordagem simplificada à beira do leito (efeitos sobre o BE, mEq/L)</p>
+    <div class="st-bar"><span>BE padrão</span><span class="v">${sinal(s.sbe)}</span>
+    <span>Efeito Na⁺ − Cl⁻ (água livre e cloro)</span><span class="v">${sinal(s.naCl)}</span>
+    <span>Efeito da albumina</span><span class="v">${sinal(s.alb)}</span>
+    <span>Efeito do lactato</span><span class="v">${sinal(s.lact)}</span>
+    <span><b>Outros ânions não medidos</b></span><span class="v">${sinal(s.outros)}</span></div>
+    <ul class="avisos"><li>Negativo = acidificante; positivo = alcalinizante. "Outros ânions" < −5 sugere cetoácidos, toxinas, ânions renais.</li>${S.avisos.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>${fontesHTML(["story2016"])}</div>`;
+  if (S.completo) h += `<div class="box"><p class="lbl">Fencl–Figge</p><div class="st-bar">
+    <span>SID aparente (SIDa)</span><span class="v">${String(S.completo.sida).replace(".", ",")}</span>
+    <span>SID efetiva (SIDe)</span><span class="v">${String(S.completo.side).replace(".", ",")}</span>
+    <span><b>SIG</b> (normal 0–2)</span><span class="v">${sinal(S.completo.sig)}</span></div>
+    <ul class="avisos"><li>SIDa = Na⁺ + K⁺ + 2·Ca²⁺ + 2·Mg²⁺ − Cl⁻ − lactato. SIDe = HCO₃⁻ + albumina·(0,123·pH − 0,631) + fosfato·(0,309·pH − 0,469).</li></ul>${fontesHTML(["fencl2000"])}</div>`;
+  $("#p-stewart").innerHTML = h;
+}
+
+function renderFontes() {
+  const nomes = { 1: "Interpretação", 2: "Conduta (guideline ou ensaio clínico)", 3: "Livro-texto / revisão (sem guideline específico)" };
+  let h = "";
+  for (const n of [1, 2, 3]) {
+    h += `<div class="box ref"><p class="lbl">${nomes[n]}</p>${Object.entries(FONTES).filter(([, f]) => f.nivel === n).map(([id, f]) => {
+      const l = linkFonte(id); return `<p>${l ? `<a href="${l}" target="_blank" rel="noopener">${esc(f.ref)}</a>` : esc(f.ref)}</p>`; }).join("")}</div>`;
+  }
+  $("#p-fontes").innerHTML = h;
+}
+
+document.addEventListener("input", (ev) => { if (ev.target.matches(".f input")) { $("#aviso-exemplo").hidden = true; render(); } });
+$("#ctx").addEventListener("click", (ev) => { const b = ev.target.closest(".chip"); if (!b) return; const id = b.dataset.ctx; ctxState[id] = !ctxState[id]; b.setAttribute("aria-pressed", ctxState[id]); render(); });
+$("#limpar").addEventListener("click", () => { carregar(null); $("#i-pH").focus(); });
+document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", x === b));
+  const t = b.dataset.tab;
+  $("#p-gaso").hidden = t !== "gaso"; $("#p-stewart").hidden = t !== "stewart"; $("#p-fontes").hidden = t !== "fontes";
+  $("#p-entrada").hidden = t === "fontes";
+}));
+renderFontes();
+carregar(EXEMPLO);
+</script>
