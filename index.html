@@ -97,7 +97,7 @@ table.calc td.fm { color: var(--muted); font-size: 12px; }
 
 <div class="wrap">
   <header class="top">
-    <h1>Gasoapp <small>v0.2 · protótipo</small></h1>
+    <h1>Gasoapp <small>v0.3 · protótipo</small></h1>
     <nav class="tabs" role="tablist">
       <button id="t-gaso" role="tab" aria-selected="true" data-tab="gaso">Gasometria</button>
       <button id="t-stewart" role="tab" aria-selected="false" data-tab="stewart">Stewart</button>
@@ -149,7 +149,7 @@ const FONTES = {
   fencl2000: { nivel: 1, ref: "Fencl V, Jabor A, Kazda A, Figge J. Diagnosis of metabolic acid-base disturbances in critically ill patients. Am J Respir Crit Care Med 2000;162:2246-51.", url: "" },
   kraut2014lact: { nivel: 2, ref: "Kraut JA, Madias NE. Lactic acidosis. N Engl J Med 2014;371:2309-19.", url: "" },
   ukka2023: { nivel: 2, ref: "UK Kidney Association. Clinical Practice Guideline: Treatment of acute hyperkalaemia in adults (2023, atualizada jul/2026).", url: "https://www.ukkidney.org/health-professionals/guidelines/guidelines-commentaries" },
-  erc2021: { nivel: 2, ref: "Lott C et al. European Resuscitation Council Guidelines 2021: Cardiac arrest in special circumstances. Resuscitation 2021;161:152-219.", url: "" },
+  erc2025: { nivel: 2, ref: "Lott C et al. European Resuscitation Council Guidelines 2025: Special circumstances in resuscitation. Resuscitation 2025;215(Suppl 1):110753.", url: "https://doi.org/10.1016/j.resuscitation.2025.110753" },
   bicaricu2018: { nivel: 2, ref: "Jaber S et al. BICAR-ICU. Sodium bicarbonate therapy for patients with severe metabolic acidaemia in the ICU. Lancet 2018;392:31-40.", url: "" },
   bicaricu2_2025: { nivel: 2, ref: "Jaber S et al. BICARICU-2. Sodium bicarbonate for severe metabolic acidemia and acute kidney injury. JAMA 2025.", url: "https://jamanetwork.com/journals/jama/fullarticle/2840824" },
   ada2024: { nivel: 2, ref: "Umpierrez GE et al. Hyperglycemic crises in adults with diabetes: a consensus report (ADA/EASD/JBDS/AACE/DTS). Diabetes Care 2024;47:1257-75.", url: "" },
@@ -199,6 +199,11 @@ function analisar(entrada) {
   if (e.fio2 !== null && e.fio2 > 1) e.fio2 = e.fio2 / 100;
 
   const R = { calculos: [], avisos: [], disturbios: [], alertas: [], hipoteses: [], oxi: null, stewart: null, resumo: "" };
+  // Unidades trocadas: corrigir só quando o valor é impossível na unidade esperada, e avisar.
+  if (e.alb !== null && e.alb > 10) { R.avisos.push(`Albumina ${e.alb} lida como g/L e convertida para ${r1(e.alb / 10)} g/dL.`); e.alb = e.alb / 10; }
+  if (e.cai !== null && e.cai > 3) { R.avisos.push(`Ca²⁺ iônico ${e.cai} lido como mg/dL e convertido para ${r2(e.cai / 4.008)} mmol/L.`); e.cai = e.cai / 4.008; }
+  if (e.lact !== null && e.lact > 15) R.avisos.push(`Lactato ${e.lact} mmol/L é muito alto: confira se o laudo não está em mg/dL (mg/dL ÷ 9 = mmol/L).`);
+  if (e.mg !== null && e.mg < 1.0) R.avisos.push(`Mg ${e.mg}: o campo é em mg/dL. Se o laudo estiver em mmol/L, multiplique por 2,43.`);
   const calc = (nome, valor, formula) => R.calculos.push({ nome, valor, formula });
 
   if (e.pH === null || e.pco2 === null || e.hco3 === null) {
@@ -210,7 +215,8 @@ function analisar(entrada) {
   const hPlus = (24 * e.pco2) / e.hco3; // nmol/L
   const pHcalc = 9 - Math.log10(hPlus);
   calc("pH calculado (Henderson)", r2(pHcalc), "H⁺ = 24 × PaCO₂ / HCO₃⁻; pH = 9 − log[H⁺]");
-  if (Math.abs(pHcalc - e.pH) > 0.04) R.avisos.push(`Valores incoerentes: pH medido ${e.pH} vs. calculado ${r2(pHcalc)}. Confira digitação ou repita a amostra.`);
+  R.incoerente = Math.abs(pHcalc - e.pH) > 0.04;
+  if (R.incoerente) R.avisos.push(`Valores incoerentes: pH medido ${e.pH} vs. calculado ${r2(pHcalc)}. Confira digitação ou repita a amostra.`);
 
   // BE padrão (Van Slyke) se não informado
   const sbe = e.be !== null ? e.be : r1(0.93 * (e.hco3 - 24.4 + 14.83 * (e.pH - 7.4)));
@@ -220,14 +226,17 @@ function analisar(entrada) {
   const acidemia = e.pH < NORMAL.pHmin, alcalemia = e.pH > NORMAL.pHmax;
   const hco3Baixo = e.hco3 < NORMAL.hco3min, hco3Alto = e.hco3 > NORMAL.hco3max;
   const pco2Alto = e.pco2 > NORMAL.pco2max, pco2Baixo = e.pco2 < NORMAL.pco2min;
-  const cronico = !!ctx.cronico;
+  const cronico = !!(ctx.cronico || ctx.dpoc); // DPOC / hipercapnia crônica implica compensação renal crônica
   const prim = [];
   if (acidemia) {
     if (hco3Baixo) prim.push("acid_met");
     if (pco2Alto) prim.push("acid_resp");
+    // pH baixo com PaCO2 e HCO3 ainda na faixa normal: usar a direção em relação a 40 / 24
+    if (!prim.length) { if (e.hco3 < NORMAL.hco3) prim.push("acid_met"); if (e.pco2 > NORMAL.pco2) prim.push("acid_resp"); }
   } else if (alcalemia) {
     if (hco3Alto) prim.push("alk_met");
     if (pco2Baixo) prim.push("alk_resp");
+    if (!prim.length) { if (e.hco3 > NORMAL.hco3) prim.push("alk_met"); if (e.pco2 < NORMAL.pco2) prim.push("alk_resp"); }
   } else {
     // pH normal com PaCO2 e HCO3 alterados = misto (ou compensação completa crônica)
     if (pco2Alto && hco3Alto) prim.push(e.pH < 7.4 ? "acid_resp" : "alk_met");
@@ -237,6 +246,7 @@ function analisar(entrada) {
   const add = (id, texto, extra = {}) => { if (!R.disturbios.find((d) => d.id === id)) R.disturbios.push({ id, texto, ...extra }); };
 
   // 4. Compensação esperada
+  let hco3Ref = NORMAL.hco3; // HCO3 de referência do delta-delta: o esperado pela compensação, se houver distúrbio respiratório primário
   for (const p of prim) {
     if (p === "acid_met") {
       add("acid_met", "Acidose metabólica", { primario: true });
@@ -248,26 +258,29 @@ function analisar(entrada) {
     if (p === "alk_met") {
       add("alk_met", "Alcalose metabólica", { primario: true });
       const esp = 40 + 0.7 * (e.hco3 - 24);
-      calc("PaCO₂ esperada", `${r1(esp - 5)}–${r1(esp + 5)}`, "40 + 0,7 × (HCO₃⁻ − 24) ± 5");
-      if (e.pco2 > esp + 5) add("acid_resp", "Acidose respiratória associada");
-      else if (e.pco2 < esp - 5) add("alk_resp", "Alcalose respiratória associada");
+      calc("PaCO₂ esperada", `${r1(esp - 2)}–${r1(esp + 2)}`, "40 + 0,7 × (HCO₃⁻ − 24) ± 2");
+      if (e.pco2 > esp + 2) add("acid_resp", "Acidose respiratória associada");
+      else if (e.pco2 < esp - 2) add("alk_resp", "Alcalose respiratória associada");
     }
     if (p === "acid_resp") {
       add("acid_resp", `Acidose respiratória ${cronico ? "crônica" : "aguda"}`, { primario: true });
       const d = (e.pco2 - 40) / 10;
-      const espAg = 24 + 1 * d, espCr = 24 + 3.5 * d;
-      const esp = cronico ? espCr : espAg;
-      calc(`HCO₃⁻ esperado (${cronico ? "crônica" : "aguda"})`, `${r1(esp - 2)}–${r1(esp + 2)}`, cronico ? "24 + 3,5 × ΔPaCO₂/10 ± 2" : "24 + 1 × ΔPaCO₂/10 ± 2");
-      if (e.hco3 > esp + 2) add("alk_met", cronico ? "Alcalose metabólica associada" : "Alcalose metabólica associada (ou componente crônico: DPOC?)");
-      else if (e.hco3 < esp - 2) add("acid_met", "Acidose metabólica associada");
+      // aguda: +1 por 10 mmHg; crônica: +4 a +5 por 10 mmHg (Berend 2014, tabela 1)
+      const lo = cronico ? 24 + 4 * d - 2 : 24 + d - 2, hi = cronico ? 24 + 5 * d + 2 : 24 + d + 2;
+      hco3Ref = cronico ? 24 + 4.5 * d : 24 + d;
+      calc(`HCO₃⁻ esperado (${cronico ? "crônica" : "aguda"})`, `${r1(lo)}–${r1(hi)}`, cronico ? "24 + 4 a 5 × ΔPaCO₂/10 ± 2" : "24 + 1 × ΔPaCO₂/10 ± 2");
+      if (e.hco3 > hi) add("alk_met", cronico ? "Alcalose metabólica associada" : "Alcalose metabólica associada (ou componente crônico: DPOC?)");
+      else if (e.hco3 < lo) add("acid_met", "Acidose metabólica associada");
     }
     if (p === "alk_resp") {
       add("alk_resp", `Alcalose respiratória ${cronico ? "crônica" : "aguda"}`, { primario: true });
       const d = (40 - e.pco2) / 10;
-      const esp = cronico ? 24 - 4 * d : 24 - 2 * d;
-      calc(`HCO₃⁻ esperado (${cronico ? "crônica" : "aguda"})`, `${r1(esp - 2)}–${r1(esp + 2)}`, cronico ? "24 − 4 × ΔPaCO₂/10 ± 2" : "24 − 2 × ΔPaCO₂/10 ± 2");
-      if (e.hco3 < esp - 2) add("acid_met", "Acidose metabólica associada");
-      else if (e.hco3 > esp + 2) add("alk_met", "Alcalose metabólica associada");
+      // aguda: −2 por 10 mmHg; crônica: −4 a −5 por 10 mmHg (Berend 2014, tabela 1)
+      const lo = cronico ? 24 - 5 * d - 2 : 24 - 2 * d - 2, hi = cronico ? 24 - 4 * d + 2 : 24 - 2 * d + 2;
+      hco3Ref = cronico ? 24 - 4.5 * d : 24 - 2 * d;
+      calc(`HCO₃⁻ esperado (${cronico ? "crônica" : "aguda"})`, `${r1(lo)}–${r1(hi)}`, cronico ? "24 − 4 a 5 × ΔPaCO₂/10 ± 2" : "24 − 2 × ΔPaCO₂/10 ± 2");
+      if (e.hco3 < lo) add("acid_met", "Acidose metabólica associada");
+      else if (e.hco3 > hi) add("alk_met", "Alcalose metabólica associada");
     }
   }
   if (!prim.length && !acidemia && !alcalemia) R.resumoBase = "Equilíbrio ácido-base sem distúrbio primário evidente";
@@ -286,10 +299,10 @@ function analisar(entrada) {
     if (agc > NORMAL.ag + 2) {
       if (!temAcidMet) add("acid_met", "Acidose metabólica com AG alto (oculta pelo pH/HCO₃⁻)");
       const dm = R.disturbios.find((d) => d.id === "acid_met"); dm.ag = "alto"; if (!/AG/.test(dm.texto)) dm.texto += " com AG alto";
-      const dAG = agc - NORMAL.ag, dHCO3 = NORMAL.hco3 - e.hco3;
+      const dAG = agc - NORMAL.ag, dHCO3 = hco3Ref - e.hco3;
       if (dHCO3 > 0.5) {
         const ratio = dAG / dHCO3;
-        calc("Delta-delta (ΔAG/ΔHCO₃⁻)", r2(ratio), "(AGc − 12) / (24 − HCO₃⁻)");
+        calc("Delta-delta (ΔAG/ΔHCO₃⁻)", r2(ratio), hco3Ref === NORMAL.hco3 ? "(AGc − 12) / (24 − HCO₃⁻)" : `(AGc − 12) / (${r1(hco3Ref)} − HCO₃⁻); ${r1(hco3Ref)} = HCO₃⁻ esperado pela compensação respiratória`);
         if (ratio < 0.8) add("acid_met_nag", "Acidose metabólica hiperclorêmica associada (Δ/Δ < 0,8)");
         else if (ratio < 1) R.avisos.push(`Δ/Δ ${r2(ratio)} (0,8–1): possível componente hiperclorêmico associado; comum na cetoacidose.`);
         else if (ratio > 2) add("alk_met", "Alcalose metabólica associada (Δ/Δ > 2)");
@@ -306,10 +319,13 @@ function analisar(entrada) {
       ox.pf = Math.round(e.pao2 / e.fio2);
       calc("PaO₂/FiO₂", ox.pf, "PaO₂ / FiO₂");
       const patm = e.patm || 760;
-      const pAO2 = e.fio2 * (patm - 47) - e.pco2 / 0.8;
+      // Equação completa do gás alveolar (R = 0,8): a forma simplificada (PaCO2/0,8) superestima o A–a em até 10 mmHg com FiO2 alta
+      const pAO2 = e.fio2 * (patm - 47) - e.pco2 * (e.fio2 + (1 - e.fio2) / 0.8);
+      ox.pAO2 = Math.round(pAO2);
       ox.aa = Math.round(pAO2 - e.pao2);
-      calc("Gradiente A–a", ox.aa, "FiO₂ × (Patm − 47) − PaCO₂/0,8 − PaO₂");
-      if (e.idade !== null) { ox.aaEsp = Math.round(e.idade / 4 + 4); calc("A–a esperado (ar ambiente)", ox.aaEsp, "idade/4 + 4"); }
+      calc("PAO₂ (gás alveolar)", ox.pAO2, "FiO₂ × (Patm − 47) − PaCO₂ × [FiO₂ + (1 − FiO₂)/0,8]");
+      calc("Gradiente A–a", ox.aa, "PAO₂ − PaO₂");
+      if (e.idade !== null && e.fio2 <= 0.25) { ox.aaEsp = Math.round(e.idade / 4 + 4); calc("A–a esperado (ar ambiente)", ox.aaEsp, "idade/4 + 4 (válido só em ar ambiente)"); }
       ox.classe = ox.pf >= 300 ? "normal" : ox.pf >= 200 ? "leve (200–300)" : ox.pf >= 100 ? "moderada (100–200)" : "grave (< 100)";
     }
     ox.hipoxemia = e.pao2 < 60 || (ox.pf !== undefined && ox.pf < 300);
@@ -330,6 +346,7 @@ function analisar(entrada) {
   R.hipoteses = hipoteses(e, R, ctx);
 
   R.resumo = R.disturbios.length ? R.disturbios.map((d) => d.texto).join(" + ") : R.resumoBase || "Sem distúrbio ácido-base";
+  if (R.incoerente) R.resumo = "Valores incoerentes (pH × PaCO₂ × HCO₃⁻): confira antes de usar. Leitura provisória: " + R.resumo;
   R.estado = acidemia ? "acidemia" : alcalemia ? "alcalemia" : "pH normal";
   R.sbe = sbe;
   return R;
@@ -338,10 +355,10 @@ function analisar(entrada) {
 function stewart(e, sbe) {
   if (e.na === null || e.cl === null) return null;
   const S = { simplificado: {}, completo: null, avisos: [] };
-  // Story 2016 (efeitos em mEq/L sobre o BE)
-  const naCl = e.na - e.cl - 38;
+  // Story 2016 (efeitos em mEq/L sobre o BE): Na−Cl−35; 0,25 × (42 − albumina g/L); 1 − lactato
+  const naCl = e.na - e.cl - 35;
   const albEf = e.alb !== null ? 0.25 * (42 - e.alb * 10) : null;
-  const lacEf = e.lact !== null ? -e.lact : null;
+  const lacEf = e.lact !== null ? 1 - e.lact : null;
   const outros = sbe - naCl - (albEf || 0) - (lacEf || 0);
   S.simplificado = { sbe, naCl: r1(naCl), alb: albEf === null ? null : r1(albEf), lact: lacEf === null ? null : r1(lacEf), outros: r1(outros) };
   if (albEf === null) S.avisos.push("Sem albumina: efeito da albumina não calculado e incluído em 'outros ânions'.");
@@ -366,26 +383,28 @@ function alertas(e, R, ctx) {
     A.push({
       nivel: grave ? "critico" : "alto", titulo: `Hipercalemia ${grave ? "grave" : "moderada"} (K⁺ ${e.k})`,
       conduta: [
-        "ECG/monitor agora. Se alteração no ECG: gluconato de cálcio 10% 30 mL IV em 10 min, ou cloreto de cálcio 10% 10 mL IV em 5 min se parada/peri-parada (ambos 6,8 mmol de Ca²⁺); reavaliar ECG e repetir se persistir.",
+        "ECG/monitor agora. Se alteração no ECG: gluconato de cálcio 10% 30 mL IV em 10 min ou cloreto de cálcio 10% 10 mL IV em 5 min (ambos ≈ 6,8 mmol de Ca²⁺); reavaliar ECG e repetir após 5 min se persistir.",
+        "Parada cardíaca por hipercalemia: cloreto de cálcio 10% 10 mL IV + bicarbonato de sódio 50 mmol IV (ex.: 50 mL de 8,4%), em vias separadas ou com flush entre eles (ERC 2025).",
+        "Amostra hemolisada ou K⁺ inesperado: repetir a dosagem, sem atrasar o tratamento se o ECG estiver alterado.",
         "Insulina regular 10 UI + glicose 25 g IV (ex.: 50 mL de glicose 50% ou 125 mL de 20%) em 15 min. Se glicemia pré < 126 mg/dL: glicose 10% 50 mL/h por 5 h. Glicemia em 0, 30, 60, 90, 120 min e depois de hora em hora até 6 h.",
         grave ? "Salbutamol 10–20 mg nebulizado como adjuvante (nunca isolado)." : "Considerar salbutamol 10–20 mg nebulizado como adjuvante.",
         "Intraop: suspender succinilcolina; corrigir acidose respiratória (aumentar ventilação); se transfusão, preferir concentrado mais recente; pensar em HM, rabdomiólise, reperfusão de membro/órgão.",
         "Remover K⁺: ciclossilicato de zircônio sódico 10 g VO 8/8 h (quando possível via enteral); diálise se refratária ou LRA oligúrica.",
-        "Bicarbonato não é rotina para hipercalemia (só se acidose metabólica grave associada).",
+        "Fora da parada, bicarbonato não é rotina para hipercalemia (só se acidose metabólica grave associada).",
       ],
-      fontes: ["ukka2023", "erc2021"],
+      fontes: ["ukka2023", "erc2025"],
     });
   }
   if (e.k !== null && e.k < 3.0) {
     A.push({
       nivel: e.k < 2.5 ? "critico" : "alto", titulo: `Hipocalemia ${e.k < 2.5 ? "grave" : "moderada"} (K⁺ ${e.k})`,
       conduta: [
-        "Arritmia/parada: KCl 2 mmol/min IV por 10 min, depois 10 mmol em 5–10 min (ERC 2021).",
+        "Parada cardíaca por hipocalemia: KCl 20 mmol IV em 2–3 min, depois 10 mmol em 2 min; então ajustar pela dosagem de K⁺ (ERC 2025).",
         "Sem arritmia: KCl IV 10 mmol/h em veia periférica; até 20 mmol/h só em acesso central com ECG contínuo. Dosar K⁺ após cada 20–40 mmol.",
         "Repor magnésio junto: sulfato de magnésio 2 g (8 mmol) IV em 10–20 min se Mg baixo ou desconhecido.",
         "Intraop: hiperventilação e alcalose, β-agonistas e insulina pioram a hipocalemia.",
       ],
-      fontes: ["erc2021", "miller"],
+      fontes: ["erc2025", "miller"],
     });
   }
   if (e.pH < 7.1) A.push({ nivel: "critico", titulo: `Acidemia grave (pH ${e.pH})`, conduta: ["Tratar a causa (ver hipóteses abaixo). Assegurar ventilação adequada para o componente respiratório.", "Vasopressores e inotrópicos perdem eficácia com pH < 7,1–7,2."], fontes: ["berend2014", "kraut2010"] });
@@ -430,7 +449,7 @@ function hipoteses(e, R, ctx) {
       fontes: ["miller"] });
     push(g, { titulo: "Hipertermia maligna", score: (ctx.gatilhoHM ? 50 : 10) + (tem("acid_met") ? 25 : 0) + (e.k !== null && e.k > 5.5 ? 15 : 0),
       reforca: ["EtCO₂ subindo apesar de aumento da ventilação", "Taquicardia, rigidez (masseter), hipertermia (tardia)", "Acidose mista + hipercalemia", "Exposição a halogenado ou succinilcolina"], afasta: ["Anestesia venosa total sem succinilcolina"],
-      conduta: ["Suspender halogenado e succinilcolina; chamar ajuda; avisar cirurgião para concluir o mais breve possível.", "Hiperventilar com O₂ 100% em alto fluxo (VM 2–3× o normal); instalar filtros de carvão ativado; manter anestesia com TIVA.", `Dantrolene 2–2,5 mg/kg IV pelo peso real${dose(2.5, 300)}, máx. 300 mg por dose; repetir a cada 10 min até controle. Total de 10 mg/kg pode ser excedido se o diagnóstico se confirmar.`, "Resfriar ativamente; parar quando T < 38,5 °C.", "Bicarbonato de sódio se pH < 7,2; tratar hipercalemia (insulina + glicose, cálcio).", "Diferenciais: sepse, tireotoxicose, feocromocitoma, síndrome serotoninérgica, sobreaquecimento."],
+      conduta: ["Suspender halogenado e succinilcolina; chamar ajuda; avisar cirurgião para concluir o mais breve possível.", "Hiperventilar com O₂ 100% em alto fluxo (VM 2–3× o normal); instalar filtros de carvão ativado; manter anestesia com TIVA.", `Dantrolene 2–2,5 mg/kg IV pelo peso real${dose(2.5, 300)}, máx. 300 mg por dose; repetir a cada 10 min até PaCO₂ < 45 mmHg (6 kPa) com ventilação minuto normal e temperatura caindo. Total de 10 mg/kg pode ser excedido se o diagnóstico se confirmar.`, "Resfriar ativamente; parar quando T < 38,5 °C.", "Bicarbonato de sódio se pH < 7,2; tratar hipercalemia (insulina + glicose, cálcio).", "Diferenciais: sepse, tireotoxicose, feocromocitoma, síndrome serotoninérgica, sobreaquecimento."],
       fontes: ["emhg2024"] });
     push(g, { titulo: "Aumento do espaço morto: TEP, embolia gasosa/CO₂, baixo débito cardíaco", score: gap !== undefined && gap > 10 ? 85 : 15,
       reforca: ["Gradiente PaCO₂−EtCO₂ > 10 mmHg", "Queda súbita de EtCO₂ com hipotensão e hipoxemia", "Insuflação de CO₂, acesso venoso aberto acima do coração"], afasta: ["Gradiente PaCO₂−EtCO₂ normal"],
@@ -457,8 +476,8 @@ function hipoteses(e, R, ctx) {
   if (acidMet && acidMet.ag !== "normal") {
     const g = acidMet.ag === "alto" ? "Acidose metabólica com AG alto" : "Acidose metabólica (AG não calculado)";
     const lact = e.lact;
-    push(g, { titulo: "Acidose lática tipo A: hipoperfusão (hemorragia, hipovolemia, choque, sepse)", score: lact !== null ? (lact >= 2 ? 95 : 10) : 60,
-      reforca: ["Lactato ≥ 2 mmol/L", "Sangramento, hipotensão, vasopressor em uso", "Sepse/choque"], afasta: ["Lactato normal"],
+    push(g, { titulo: "Acidose lática tipo A: hipoperfusão (hemorragia, hipovolemia, choque, sepse)", score: lact !== null ? (lact >= 2 ? 95 : ctx.sepse ? 30 : 10) : ctx.sepse ? 85 : 60,
+      reforca: ["Lactato ≥ 2 mmol/L", "Sangramento, hipotensão, vasopressor em uso", "Sepse/choque"].concat(ctx.sepse ? ["Contexto marcado: sepse/choque"] : []), afasta: ["Lactato normal"],
       conduta: ["Controlar a fonte (sangramento/foco séptico).", "Fluidos guiados por responsividade, preferindo cristaloide balanceado; sepse com hipoperfusão: 30 mL/kg nas primeiras 3 h (recomendação fraca) e reavaliar.", "PAM ≥ 65 mmHg com noradrenalina como 1ª linha.", "Hemorragia: hemocomponentes conforme protocolo de transfusão maciça; manter Ca²⁺ iônico normal.", "Repetir lactato em 2 h."],
       fontes: ["ssc2021", "trauma2023", "kraut2014lact"] });
     push(g, { titulo: "Acidose lática tipo B: adrenalina em infusão, metformina, nitroprussiato (cianeto), síndrome de infusão de propofol", score: lact !== null && lact >= 2 ? 40 : 5,
@@ -470,7 +489,7 @@ function hipoteses(e, R, ctx) {
       fontes: ["ada2024"] });
     push(g, { titulo: "Lesão renal aguda / DRC (acúmulo de ânions)", score: ctx.renal ? 70 : 15,
       reforca: ["LRA ou DRC conhecida", "Creatinina/ureia elevadas", "Hipercalemia associada"], afasta: ["Função renal normal"],
-      conduta: ["pH ≤ 7,20 com LRA KDIGO 2–3: bicarbonato de sódio 4,2% 125–250 mL IV em 30 min, repetir até pH ≥ 7,30, máx. 1.000 mL/24 h. Reduziu necessidade de diálise (BICAR-ICU, BICARICU-2), sem reduzir mortalidade em 90 dias (BICARICU-2).", "Garantir ventilação capaz de eliminar o CO₂ gerado pelo bicarbonato.", "Indicações de diálise: acidose ou hipercalemia refratárias, sobrecarga volêmica."],
+      conduta: ["pH ≤ 7,20, HCO₃⁻ ≤ 20 e PaCO₂ ≤ 45 mmHg com LRA KDIGO 2–3: bicarbonato de sódio 4,2% 125–250 mL IV em 30 min, repetir até pH ≥ 7,30, máx. 1.000 mL/24 h. Reduziu necessidade de diálise (BICAR-ICU, BICARICU-2), sem reduzir mortalidade em 90 dias (BICARICU-2).", "Garantir ventilação capaz de eliminar o CO₂ gerado pelo bicarbonato.", "Indicações de diálise: acidose ou hipercalemia refratárias, sobrecarga volêmica."],
       fontes: ["bicaricu2_2025", "bicaricu2018"] });
     push(g, { titulo: "Intoxicações (metanol, etilenoglicol, salicilato)", score: 3, reforca: ["Gap osmolal elevado", "História de ingestão"], afasta: ["Contexto cirúrgico eletivo sem história sugestiva"], conduta: ["Dosar osmolalidade e calcular gap osmolal; acionar centro de toxicologia."], fontes: ["kraut2010"] });
   }
@@ -511,9 +530,13 @@ function hipoteses(e, R, ctx) {
   }
   if (R.oxi && R.oxi.hiperoxia) push("Hiperóxia", { titulo: `PaO₂ ${e.pao2} mmHg`, score: 20, reforca: [], afasta: [], conduta: ["Considerar reduzir FiO₂ para o mínimo que mantenha SpO₂ 94–98%, exceto em contexto que justifique FiO₂ alta."], fontes: ["young2019"] });
 
-  // ordenar por grupo (mantendo ordem de aparecimento) e score dentro do grupo
+  // ordenar grupos: primeiro os do distúrbio primário, depois os associados, por último oxigenação; score dentro do grupo
+  const primarios = R.disturbios.filter((d) => d.primario).map((d) => d.id);
+  const idDoGrupo = (g) => (g.startsWith("Acidose respiratória") ? "acid_resp" : g.startsWith("Alcalose respiratória") ? "alk_resp" : g.startsWith("Alcalose metabólica") ? "alk_met" : g.startsWith("Acidose metabólica") ? "acid_met" : null);
+  const peso_ = (g) => (idDoGrupo(g) === null ? 2 : primarios.includes(idDoGrupo(g)) ? 0 : 1);
   const ordemGrupo = [];
   H.forEach((h) => { if (!ordemGrupo.includes(h.grupo)) ordemGrupo.push(h.grupo); });
+  ordemGrupo.sort((a, b) => peso_(a) - peso_(b));
   return ordemGrupo.map((g) => ({ grupo: g, itens: H.filter((h) => h.grupo === g && h.score > 0).sort((a, b) => b.score - a.score) }));
 }
 
@@ -578,7 +601,10 @@ function lerLaudo(texto) {
     let x = v;
     const u = un.toLowerCase();
     if ((c === "pco2" || c === "pao2") && (/kpa/.test(u) || (c === "pco2" && x < 15) || (c === "pao2" && x < 40 && /kpa/.test(texto.toLowerCase())))) { x = Math.round(x * KPA_PARA_MMHG); notas.push(`${c === "pco2" ? "PaCO₂" : "PaO₂"} convertida de kPa para mmHg.`); }
-    if (c === "glic" && (/mmol/.test(u) || x < 35)) { x = Math.round(x * 18); notas.push("Glicose convertida de mmol/L para mg/dL."); }
+    // Glicose: converter só com unidade mmol/L explícita. Sem unidade e valor < 35, não preencher
+    // (35 mg/dL é hipoglicemia real; 35 mmol/L seria 630 mg/dL: o erro nos dois sentidos é perigoso).
+    if (c === "glic" && /mmol/.test(u)) { x = Math.round(x * 18); notas.push("Glicose convertida de mmol/L para mg/dL."); }
+    else if (c === "glic" && !/mg/.test(u) && x < 35) { notas.push(`Glicose ${x} sem unidade no texto: não preenchida (mg/dL ou mmol/L?). Digite à mão.`); continue; }
     if (c === "lact" && /mg/.test(u)) { x = Math.round((x / 9.01) * 10) / 10; notas.push("Lactato convertido de mg/dL para mmol/L."); }
     if (c === "cai" && x > 3) { x = Math.round((x / 4.008) * 100) / 100; notas.push("Ca²⁺ iônico convertido de mg/dL para mmol/L."); }
     if (c === "fio2" && x <= 1) x = Math.round(x * 100);
@@ -670,12 +696,12 @@ function renderStewart(R) {
     <span>Efeito da albumina</span><span class="v">${sinal(s.alb)}</span>
     <span>Efeito do lactato</span><span class="v">${sinal(s.lact)}</span>
     <span><b>Outros ânions não medidos</b></span><span class="v">${sinal(s.outros)}</span></div>
-    <ul class="avisos"><li>Negativo = acidificante; positivo = alcalinizante. "Outros ânions" < −5 sugere cetoácidos, toxinas, ânions renais.</li>${S.avisos.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>${fontesHTML(["story2016"])}</div>`;
+    <ul class="avisos"><li>Efeito Na⁺−Cl⁻ = Na⁺ − Cl⁻ − 35; albumina = 0,25 × (42 − albumina g/L); lactato = 1 − lactato; outros = BE − soma dos efeitos.</li><li>Negativo = acidificante; positivo = alcalinizante. "Outros ânions" < −5 sugere cetoácidos, toxinas, ânions renais.</li>${S.avisos.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>${fontesHTML(["story2016"])}</div>`;
   if (S.completo) h += `<div class="box"><p class="lbl">Fencl–Figge</p><div class="st-bar">
     <span>SID aparente (SIDa)</span><span class="v">${String(S.completo.sida).replace(".", ",")}</span>
     <span>SID efetiva (SIDe)</span><span class="v">${String(S.completo.side).replace(".", ",")}</span>
-    <span><b>SIG</b> (normal 0–2)</span><span class="v">${sinal(S.completo.sig)}</span></div>
-    <ul class="avisos"><li>SIDa = Na⁺ + K⁺ + 2·Ca²⁺ + 2·Mg²⁺ − Cl⁻ − lactato. SIDe = HCO₃⁻ + albumina·(0,123·pH − 0,631) + fosfato·(0,309·pH − 0,469).</li></ul>${fontesHTML(["fencl2000"])}</div>`;
+    <span><b>SIG</b> (ânions não medidos)</span><span class="v">${sinal(S.completo.sig)}</span></div>
+    <ul class="avisos"><li>Não há faixa normal padronizada para o SIG: com valores laboratoriais normais estas equações dão cerca de 3–5. Compare com a gasometria anterior do mesmo paciente.</li><li>SIDa = Na⁺ + K⁺ + 2·Ca²⁺ + 2·Mg²⁺ − Cl⁻ − lactato. SIDe = HCO₃⁻ + albumina·(0,123·pH − 0,631) + fosfato·(0,309·pH − 0,469).</li></ul>${fontesHTML(["fencl2000"])}</div>`;
   $("#p-stewart").innerHTML = h;
 }
 

@@ -9,7 +9,7 @@ const FONTES = {
   fencl2000: { nivel: 1, ref: "Fencl V, Jabor A, Kazda A, Figge J. Diagnosis of metabolic acid-base disturbances in critically ill patients. Am J Respir Crit Care Med 2000;162:2246-51.", url: "" },
   kraut2014lact: { nivel: 2, ref: "Kraut JA, Madias NE. Lactic acidosis. N Engl J Med 2014;371:2309-19.", url: "" },
   ukka2023: { nivel: 2, ref: "UK Kidney Association. Clinical Practice Guideline: Treatment of acute hyperkalaemia in adults (2023, atualizada jul/2026).", url: "https://www.ukkidney.org/health-professionals/guidelines/guidelines-commentaries" },
-  erc2021: { nivel: 2, ref: "Lott C et al. European Resuscitation Council Guidelines 2021: Cardiac arrest in special circumstances. Resuscitation 2021;161:152-219.", url: "" },
+  erc2025: { nivel: 2, ref: "Lott C et al. European Resuscitation Council Guidelines 2025: Special circumstances in resuscitation. Resuscitation 2025;215(Suppl 1):110753.", url: "https://doi.org/10.1016/j.resuscitation.2025.110753" },
   bicaricu2018: { nivel: 2, ref: "Jaber S et al. BICAR-ICU. Sodium bicarbonate therapy for patients with severe metabolic acidaemia in the ICU. Lancet 2018;392:31-40.", url: "" },
   bicaricu2_2025: { nivel: 2, ref: "Jaber S et al. BICARICU-2. Sodium bicarbonate for severe metabolic acidemia and acute kidney injury. JAMA 2025.", url: "https://jamanetwork.com/journals/jama/fullarticle/2840824" },
   ada2024: { nivel: 2, ref: "Umpierrez GE et al. Hyperglycemic crises in adults with diabetes: a consensus report (ADA/EASD/JBDS/AACE/DTS). Diabetes Care 2024;47:1257-75.", url: "" },
