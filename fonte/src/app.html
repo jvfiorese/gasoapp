@@ -89,7 +89,7 @@ table.calc td.fm { color: var(--muted); font-size: 12px; }
 
 <div class="wrap">
   <header class="top">
-    <h1>Gasoapp <small>v0.2 · protótipo</small></h1>
+    <h1>Gasoapp <small>v0.3 · protótipo</small></h1>
     <nav class="tabs" role="tablist">
       <button id="t-gaso" role="tab" aria-selected="true" data-tab="gaso">Gasometria</button>
       <button id="t-stewart" role="tab" aria-selected="false" data-tab="stewart">Stewart</button>
@@ -216,12 +216,12 @@ function renderStewart(R) {
     <span>Efeito da albumina</span><span class="v">${sinal(s.alb)}</span>
     <span>Efeito do lactato</span><span class="v">${sinal(s.lact)}</span>
     <span><b>Outros ânions não medidos</b></span><span class="v">${sinal(s.outros)}</span></div>
-    <ul class="avisos"><li>Negativo = acidificante; positivo = alcalinizante. "Outros ânions" < −5 sugere cetoácidos, toxinas, ânions renais.</li>${S.avisos.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>${fontesHTML(["story2016"])}</div>`;
+    <ul class="avisos"><li>Efeito Na⁺−Cl⁻ = Na⁺ − Cl⁻ − 35; albumina = 0,25 × (42 − albumina g/L); lactato = 1 − lactato; outros = BE − soma dos efeitos.</li><li>Negativo = acidificante; positivo = alcalinizante. "Outros ânions" < −5 sugere cetoácidos, toxinas, ânions renais.</li>${S.avisos.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>${fontesHTML(["story2016"])}</div>`;
   if (S.completo) h += `<div class="box"><p class="lbl">Fencl–Figge</p><div class="st-bar">
     <span>SID aparente (SIDa)</span><span class="v">${String(S.completo.sida).replace(".", ",")}</span>
     <span>SID efetiva (SIDe)</span><span class="v">${String(S.completo.side).replace(".", ",")}</span>
-    <span><b>SIG</b> (normal 0–2)</span><span class="v">${sinal(S.completo.sig)}</span></div>
-    <ul class="avisos"><li>SIDa = Na⁺ + K⁺ + 2·Ca²⁺ + 2·Mg²⁺ − Cl⁻ − lactato. SIDe = HCO₃⁻ + albumina·(0,123·pH − 0,631) + fosfato·(0,309·pH − 0,469).</li></ul>${fontesHTML(["fencl2000"])}</div>`;
+    <span><b>SIG</b> (ânions não medidos)</span><span class="v">${sinal(S.completo.sig)}</span></div>
+    <ul class="avisos"><li>Não há faixa normal padronizada para o SIG: com valores laboratoriais normais estas equações dão cerca de 3–5. Compare com a gasometria anterior do mesmo paciente.</li><li>SIDa = Na⁺ + K⁺ + 2·Ca²⁺ + 2·Mg²⁺ − Cl⁻ − lactato. SIDe = HCO₃⁻ + albumina·(0,123·pH − 0,631) + fosfato·(0,309·pH − 0,469).</li></ul>${fontesHTML(["fencl2000"])}</div>`;
   $("#p-stewart").innerHTML = h;
 }
 

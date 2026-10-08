@@ -55,7 +55,10 @@ function lerLaudo(texto) {
     let x = v;
     const u = un.toLowerCase();
     if ((c === "pco2" || c === "pao2") && (/kpa/.test(u) || (c === "pco2" && x < 15) || (c === "pao2" && x < 40 && /kpa/.test(texto.toLowerCase())))) { x = Math.round(x * KPA_PARA_MMHG); notas.push(`${c === "pco2" ? "PaCO₂" : "PaO₂"} convertida de kPa para mmHg.`); }
-    if (c === "glic" && (/mmol/.test(u) || x < 35)) { x = Math.round(x * 18); notas.push("Glicose convertida de mmol/L para mg/dL."); }
+    // Glicose: converter só com unidade mmol/L explícita. Sem unidade e valor < 35, não preencher
+    // (35 mg/dL é hipoglicemia real; 35 mmol/L seria 630 mg/dL: o erro nos dois sentidos é perigoso).
+    if (c === "glic" && /mmol/.test(u)) { x = Math.round(x * 18); notas.push("Glicose convertida de mmol/L para mg/dL."); }
+    else if (c === "glic" && !/mg/.test(u) && x < 35) { notas.push(`Glicose ${x} sem unidade no texto: não preenchida (mg/dL ou mmol/L?). Digite à mão.`); continue; }
     if (c === "lact" && /mg/.test(u)) { x = Math.round((x / 9.01) * 10) / 10; notas.push("Lactato convertido de mg/dL para mmol/L."); }
     if (c === "cai" && x > 3) { x = Math.round((x / 4.008) * 100) / 100; notas.push("Ca²⁺ iônico convertido de mg/dL para mmol/L."); }
     if (c === "fio2" && x <= 1) x = Math.round(x * 100);
